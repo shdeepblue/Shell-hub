@@ -1,0 +1,30 @@
+#!/bin/bash
+
+echo "the # here does not begin a comment."
+echo 'The # here does not begin a comment.'
+echo The \# here does ont begin a comment.
+echo The # here gegins a comment.
+
+echo ${PATH#*:} # parameter substituion, not a comment.
+echo $((2#101011)) #base conversion, not a commet.
+
+filename='test.sh'
+
+echo "comment in same line"
+if [ -x "$filename" ]; then # Note the spage after the semicolon. #+
+	echo "File $filename exists."; 
+	cp $filename $filename.back
+else
+	echo "file $filename not found."; touch $filename
+fi; echo "file test complete" 
+
+variable='abc'
+case "$variable" in
+	abc) echo "\$variable = abc" ;;
+	xyz) echo "\$variable = xyz" ;;
+esac
+
+:
+echo $?
+# 0
+

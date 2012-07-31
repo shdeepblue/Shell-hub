@@ -1,0 +1,131 @@
+#! /bin/sh
+
+if [ $# -lt 3 ]; then
+    echo "Usage: `basename $0` DBUserName DBName DumpPathAndName"
+    exit 1
+fi
+
+username=$1
+dbname=$2
+dbfile=$3
+datetime=$(date +%Y%m%d%H%I%S)
+#schemaname=`grep search_path $dbfile.clr | awk -F\" '{print $2}'`
+
+. /space/postgresql/SUScripts/paths.shinc
+
+logfile=/tmp/${dbname}.${datetime}.log
+echo "Logging to $logfile ..."
+
+
+function log() {
+  echo "$0[$$]:$(date +%Y%m%d%H%M):$@" >> $logfile 
+}
+
+
+function dbdrop() {
+  log "Dropping database $dbname..."
+  time dropdb -e $dbname >> $logfile 2>&1
+  if [ $? -ne 0 ]; then
+    log "ERROR: Drop failed for $dbname... exiting."
+    exit 2
+  fi
+}
+
+
+function dbcreate() {
+  log "Creating UNICODE database $dbname as user $username..."
+  #time createdb -e -U $username $dbname >> $logfile 2>&1
+  time createdb -e -E UNICODE -U $username $dbname >> $logfile 2>&1
+  if [ $? -ne 0 ]; then
+    log "ERROR: Create database failed for $dbname as user $username... exiting."
+    exit 3
+  fi
+}
+
+
+# start with a clean database or schema (if this is the Report DB)...
+checkdbexistence=`psql -l | grep -w $dbname | awk '{ print $1 }'`
+if [ "$checkdbexistence" == "$dbname" ]; then
+  if [ ! "$checkdbexistence" == "Report" ]; then
+    dbdrop
+    dbcreate
+  fi
+else
+  log "WARN: Database $dbname Does not Exist."
+  dbcreate
+fi 
+
+
+log "Preprocessing $dbfile.clr..."
+# make multiline statments into one, grep certain ones out.
+# hacked to do tilde in sed since \n isn't working 
+# in some versions. tr changes it back to newline.
+grep -v "^--" $dbfile.clr|tr -d '\n'|sed "s/;/;\~/g"|tr '~' '\n'|grep "CREATE .*INDEX" >/tmp/${dbname}.${datetime}.last 2>&1
+# for a 7.3 to 7.4 restore...
+grep -v "^--" $dbfile.clr|tr -d '\n'|sed "s/;/;\~/g"|tr '~' '\n'|grep "CREATE CONSTRAINT TRIGGER" >/tmp/${dbname}.${datetime}.verylast 2>&1
+grep -v "^--" $dbfile.clr|tr -d '\n'|sed "s/;/;\~/g"|tr '~' '\n'|grep "ALTER TABLE ONLY .* ADD CONSTRAINT" >>/tmp/${dbname}.${datetime}.verylast 2>&1
+#grep -v "^--" $dbfile.clr|tr -d '\n'|sed "s/;/;\~/g"|tr '~' '\n'|grep -v -e "CREATE .*INDEX" -e "DROP " -e "CREATE CONSTRAINT TRIGGER" >/tmp/${dbname}.${datetime}.first 2>&1 
+#echo "CREATE SCHEMA \"$schemaname\"; ALTER SCHEMA \"$schemaname\" OWNER TO postgres;COMMENT ON SCHEMA \"$schemaname\" IS 'SU $schemaname Database';" >/tmp/${dbname}.${datetime}.first 2>&1
+grep -v "^--" $dbfile.clr|tr -d '\n'|sed "s/;/;\~/g"|tr '~' '\n'|grep -v -e "CREATE .*INDEX" -e "DROP " -e "CREATE CONSTRAINT TRIGGER" -e "ALTER TABLE ONLY .* ADD CONSTRAINT" -e "ALTER .* OWNER TO" >>/tmp/${dbname}.${datetime}.first 2>&1 
+
+
+log "Creating Schema in $dbname..."
+time psql -e -U $username $dbname -f /tmp/${dbname}.${datetime}.first >> $logfile 2>&1
+if [ $? -ne 0 ]; then
+  log "ERROR: Schema creation failed for $dbname... exiting."
+  exit 4
+fi
+
+
+log "Restoring Data from $dbfile.dmp to $dbname..."
+#time pg_restore -U $username -d $dbname $dbfile.dmp >> $logfile 2>&1
+#time pg_restore -r -v -U $username -d $dbname $dbfile.dmp >> $logfile 2>&1
+time pg_restore -v -U $username -d $dbname $dbfile.dmp >> $logfile 2>&1
+if [ $? -ne 0 ]; then
+  log "ERROR: Restore failed for $dbname... exiting."
+  exit 5
+fi
+
+
+# -- ---------------------------------
+#exit $?
+# -- ---------------------------------
+
+
+log "Creating indexes in $dbname..."
+time psql -e -U $username $dbname -f /tmp/${dbname}.${datetime}.last >> $logfile 2>&1
+if [ $? -ne 0 ]; then
+  log "ERROR: Index creation failed for $dbname... exiting." >> $logfile
+  exit 6
+fi
+
+
+log "Creating constraint triggers in $dbname..."
+time psql -e -U $username $dbname -f /tmp/${dbname}.${datetime}.verylast >> $logfile 2>&1
+if [ $? -ne 0 ]; then
+  log "ERROR: Drop failed for $dbname... exiting."
+  exit 7
+fi
+
+
+if [ ! "$checkdbexistence" == "Report" ]; then
+  log "Vacuuming $dbname..."
+  #time psql -e -U $username $dbname <<EOF 
+  #vacuum verbose analyze;
+  #\q
+  #\\q
+  #EOF>> $logfile 2>&1
+  time psql -e -U $username $dbname -c "vacuum verbose analyze" >> $logfile 2>&1
+  if [ $? -ne 0 ]; then
+    log "ERROR: Vacuum failed for $dbname... exiting."
+    exit 8
+  fi
+fi
+
+
+#log "Cleaning up.  Log file is $logfile ."
+#rm /tmp/${dbname}.${datetime}.first /tmp/${dbname}.${datetime}.last
+
+
+log "Done."
+exit 0

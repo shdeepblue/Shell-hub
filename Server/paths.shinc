@@ -1,0 +1,8 @@
+export PATH=/usr/bin:$PATH
+export PGUSER=postgres
+export PGPORT=5432
+export PGHOME=/space/postgresql
+export PGDATA=$PGHOME/data
+export PGBACKUPS=$PGHOME/backups
+export PGMANUALDUMPS=$PGHOME/manualDumps
+export PGVACUUMS=$PGHOME/vacuums
