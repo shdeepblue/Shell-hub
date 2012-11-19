@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# 璶だ猂 openwebmail 硂狝叭┮玻ネ logfile 戈
+# だ猂琌 /var/log/openwebmail.log 硂郎
+# ヘ玡度だ猂
+#	1. 祅Ω计
+#	2. 岿粇祅Ω计
+#	3. 肚癳筿秎ンΩ计
+#
+# Writtern by VBird
+#
+# 2005/01/09    VBird   Released
+#
+#####################################################################
+# Openwebmail 祅魁戈ㄧ计
+funcopenwebmail () {
+	echo "================= Openwebmail 祅魁郎戈癟稪俱 ======================="	>> $logfile
+	grep "$y" /var/log/openwebmail.log > $basedir/openwebmaillog
+
+	# 1. 眔Θ祅Ω计
+	testing1=`grep 'login' $basedir/openwebmaillog | grep -v error`
+	if [ "$testing1" != "" ]; then
+		echo "Θ祅 OpenWebmail Ω计参璸"					>> $logfile
+		echo "眀腹 ㄓ方 Ω计" | \
+			awk '{printf("%-6s %-10s %-15s %-4s\n", " ", $1, $2, $3)}'		>> $logfile
+		grep 'login' $basedir/openwebmaillog | grep -v error | awk '{print $9 " " $8}'|\
+			sed 's/(//g' | sed 's/)//g' | sort |\
+			awk '{ for( i=0; i<1; i++ ) Number[$i]++ };
+				END{ for( course in Number )
+				printf( "%-25s %3d\n", course, Number[course])}' |\
+			sort -k 3 -gr  | \
+			awk '{printf("%-6s %-10s %-15s %3d\n", " ",$1, $2, $3)}'		>> $logfile
+		echo " "									>> $logfile
+		testing2=`grep 'send message' $basedir/openwebmaillog`
+	fi
+
+	# 2. 狦Τ祅筁тΤ癳秎ン°
+	if [ "$testing2" != "" ]; then
+		echo "ノ OpenWebmail 祇癳獺ンΩ计参璸"					>> $logfile
+		echo "眀腹 ㄓ方 Ω计" | \
+			awk '{printf("%-6s %-10s %-15s %-4s\n", " ", $1, $2, $3)}'		>> $logfile
+		grep 'send message' $basedir/openwebmaillog | awk '{print $9 " " $8}'|\
+			sed 's/(//g' | sed 's/)//g' | sort |\
+			awk '{ for( i=0; i<1; i++ ) Number[$i]++ };
+				END{ for( course in Number )
+				printf( "%-25s %3d\n", course, Number[course])}' |\
+			sort -k 3 -gr  | \
+			awk '{printf("%-6s %-10s %-15s %3d\n", " ",$1, $2, $3)}'		>> $logfile
+		echo " "									>> $logfile
+	fi
+	
+	# 3. 岿粇祅Ω计
+	testing3=`grep 'login' $basedir/openwebmaillog | grep error`
+	if [ "$testing3" != "" ]; then
+		echo "祅ア毖 OpenWebmail Ω计参璸"					>> $logfile
+		echo "眀腹 ㄓ方 Ω计" | \
+			awk '{printf("%-6s %-10s %-15s %-4s\n", " ", $1, $2, $3)}'		>> $logfile
+		grep 'login' $basedir/openwebmaillog | grep  error | awk '{print $9 " " $8}'|\
+			sed 's/(//g' | sed 's/)//g' | sort |\
+			awk '{ for( i=0; i<1; i++ ) Number[$i]++ };
+				END{ for( course in Number )
+				printf( "%-25s %3d\n", course, Number[course])}' |\
+			sort -k 3 -gr  | \
+			awk '{printf("%-6s %-10s %-15s %3d\n", " ",$1, $2, $3)}'		>> $logfile
+		echo " "									>> $logfile
+	fi
+
+	# 4. 常⊿Τヴ戈癟
+	if [ "$testing1" == "" ] && [ "$testing2" == "" ] && [ "$testing3" == "" ] ; then
+		echo "セら⊿Τヴ Open Webmail 戈癟°"					>> $logfile
+		echo " "									>> $logfile
+	fi
+	echo " "										>> $logfile
+}

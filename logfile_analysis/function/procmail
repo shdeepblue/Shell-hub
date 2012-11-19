@@ -1,0 +1,24 @@
+#!/bin/bash
+#
+# 主要分析 mail server 這個服務所產生的 logfile 資料，
+# 分析的是 /var/log/procmail 這個檔案
+#
+# Writtern by VBird
+#
+# 2004/12/28    VBird   Released
+#
+#####################################################################
+# 9 procmail 的登錄資料的功能函數 (Function) ！
+funcprocmail () {
+	echo "================= Procmail 的登錄檔資訊彙整 ===================="	>> $logfile
+	echo "底下為今天信寄入本機的資訊"					>> $logfile
+	logprocmail=`/bin/ls /var/log/ | grep procmail| head -n 1`
+	declare -i nuall=`wc -l /var/log/"$logprocmail" | awk '{print $1}'`
+	dayproc=`cat "$basedir/dattime"`
+	declare -i nufir=`grep -n "$dayproc"  \
+		         /var/log/$logprocmail | cut -d ':' -f1|head -n 1`
+	declare -i num=$nuall-$nufir+1
+	tail -n $num /var/log/$logprocmail					>> $logfile
+	echo " "								>> $logfile
+}
+

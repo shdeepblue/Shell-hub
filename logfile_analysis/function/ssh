@@ -1,0 +1,78 @@
+#!/bin/bash
+#
+# 主要分析 sshd 這個服務所產生的 logfile 資料，
+# 分析的是 /var/log/messages 這個檔案
+#
+# Writtern by VBird
+#
+# 2004/12/28    VBird   Released
+# 2005/01/05    VBird   因為 awk 不再需要 \ 跳脫 % ，所以修訂之！
+#
+#####################################################################
+# SSH 的登錄資料的功能函數 (Function) 這其中包含 su 指令！
+funcssh () {
+	echo "================= SSH 的登錄檔資訊彙整 ======================="	>> $logfile
+	sshright=`cat $basedir/securelog |grep 'sshd.*Accept' | wc -l | \
+		awk '{print $1}'`
+	if [ "$sshright" != "0" ]; then
+		echo "一共成功登入的次數： $sshright" | \
+			awk '{printf("%-26s %3d\n",$1,$2)}' 			>> $logfile
+		echo "帳號   來源位址 次數 "| \
+			awk '{printf("%-6s %-10s %-15s %-4s\n", " ",$1, $2, $3)}'	>> $logfile
+		cat $basedir/securelog | grep 'sshd.*Accept' | \
+			sed 's/^.*for//g' |awk '{print $1}' \
+			> "$basedir/securelogssh-1"
+		cat $basedir/securelog | grep 'sshd.*Accept' | \
+			sed 's/^.*from//g' |awk '{print $1}' \
+			> "$basedir/securelogssh-2"
+		paste $basedir/securelogssh-1 $basedir/securelogssh-2  \
+			> $basedir/securelogssh
+		/bin/awk '{ for( i=0; i<1; i++ ) Number[$i]++ };
+			END{ for( course in Number )
+			printf( "%-25s %3d\n", course, Number[course])}' \
+			$basedir/securelogssh | sort -k 3 -gr  | \
+			awk '{printf("%-6s %-10s %-15s %3d\n", " ",$1, $2, $3)}'	>> $logfile
+		echo " "							>> $logfile
+	fi
+	ssherror=`cat $basedir/securelog | grep "sshd.*Fail" | wc -l | \
+		awk '{print $1}'`
+	if [ "$ssherror" != "0" ]; then
+		echo "一共錯誤登入的次數: $ssherror" | \
+			awk '{printf( "%-6s %-26s %3d\n", " ",$1, $2)}'		>> $logfile
+		echo "帳號   來源位址 次數 "| \
+			awk '{printf("%-6s %-10s %-15s %-4s\n", " ", $1, $2, $3)}'	>> $logfile
+		cat $basedir/securelog | grep "sshd.*Fail" | \
+			sed 's/^.*for//g' |awk '{print $1}' \
+			>  "$basedir/securelogsshno-1"
+		cat $basedir/securelog | grep "sshd.*Fail" | \
+			sed 's/^.*from//g' |awk '{print $1}' \
+			>  "$basedir/securelogsshno-2"
+		paste $basedir/securelogsshno-1 $basedir/securelogsshno-2 \
+			> $basedir/securelogsshno
+		/bin/awk '{ for( i=0; i<1; i++ ) Number[$i]++ };
+			END{ for( course in Number )
+			printf( "%-25s %3d\n", course, Number[course])}' \
+			$basedir/securelogsshno |sort -k 3 -gr  | \
+			awk '{printf("%-6s %-10s %-15s %3d\n", " ", $1, $2, $3)}'	>> $logfile
+		echo " "							>> $logfile
+	fi
+	cat $basedir/messageslog | grep "su"|grep "open"|grep "root"| \
+		sed 's/^.*by//g' |awk '{print $1}'|sort   >  $basedir/messagessu
+	sshsu=`wc -l $basedir/messagessu | awk '{print $1}'`
+	if [ "$sshsu" != "0" ]; then
+		echo "以 su 轉換成 root 的使用者及次數" 			>> $logfile
+		echo "帳號   次數 "| \
+			awk '{printf("%-6s %-26s %-4s\n", " ", $1, $2)}'		>> $logfile
+		/bin/awk '{ for( i=0; i<1; i++ ) Number[$i]++ };
+			END{ for( course in Number )
+			printf( "%-25s %3d\n", course, Number[course])}' \
+			$basedir/messagessu   | sort -k 3 -gr | \
+			awk '{printf("%-6s %-25s %3d\n", " ", $1, $2)}'			>> $logfile
+		echo " "							>> $logfile
+	fi
+	if [ "$sshright" == "0" ] && [ "$ssherror" == "0" ]; then
+		echo "今日沒有使用 SSH 的紀錄"					>> $logfile
+		echo " "							>> $logfile
+	fi
+}
+
